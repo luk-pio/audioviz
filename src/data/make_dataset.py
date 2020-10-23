@@ -15,10 +15,12 @@ from src.common.dataset_config import dataset_config_factory
 import src.common.log
 
 
-def find_files(root: str, file_types: List[str] = None) -> Dict[str, List[str]]:
+def find_files_recursive(
+    root: str, file_types: List[str] = None
+) -> Dict[str, List[str]]:
     """
-    Recursively find all files in a directory and organize them into a dictionary where keys are names of parent
-    directories and values are filenames. If file_types is given, filter files by extensions in file_types.
+    Recursively walk through subdirectories of root and construct a dictionary of directory_name: List[filenames] pairs
+    If file_types is given, filter files by extensions in file_types.
 
     :param root: The root directory
     :param file_types: List of extensions to find
@@ -46,15 +48,15 @@ def load_sample(
     normalize: bool = True,
 ) -> Tuple[str, Optional[np.ndarray], Optional[Dict[str, Any]]]:
     """
-    Load a sample as a one-dimensional np.ArrayLike. If sample has more than one track, it will be converted to mono.
-    Returns None as the np.array if file could not be read.
+    Load a sample as a one-dimensional np.ndarray. If sample has more than one track, it will be converted to mono.
+    Returns None if file could not be read.
 
-    :param metadata_extractor:
+    :param metadata_extractor: function used for extracting metadata from the filename
     :param fp: Path of the file.
-    :param sr: Samplerate to load the sample at. If left as None, the file samplerate is used.
+    :param sr: Samplerate to load the sample at. If left as None, the files original samplerate is used.
     :param duration: Max sample duration in seconds. If None, array will equal original file length.
     If sample is longer, it will be cropped. If shorter, the array will be padded with zeros.
-    :param normalize: If true magnitude will be normalized to a value between 0 and 1.
+    :param normalize: If True, magnitude will be normalized to a value between 0 and 1.
     :return: a tuple containing (filename, np.array, metadata_dict)
     """
 
@@ -67,11 +69,13 @@ def load_sample(
         return fp, None, None
     file_length = len(audio)
     if file_length == 0:  # ignore zero-length samples
+        logging.info(f"File {fp} is of length 0")
         return fp, None, None
     if duration:
         audio.resize(int(duration * sr))
     max_val = np.abs(audio).max()
     if max_val == 0:  # ignore completely silent sounds
+        logging.info(f"File {fp} is silent")
         return fp, None, None
     if normalize:
         audio /= max_val
@@ -104,7 +108,7 @@ def load_samples(
     :param normalize: If true magnitude will be normalized to a value between 0 and 1.
     :param processes: The number of worker processes to use. If None use os.cpu_count() cores.
     :param limit: The limit of files to load in each directory.
-    :return: Dictionary of directories to list of (filename, np.array, metadata_dict)
+    :return: List of (filename, np.array, metadata_dict)
     """
 
     # TODO multiprocessing
@@ -128,7 +132,7 @@ def load_samples(
     return [job(fn) for fn in file_list[:limit]]
 
 
-def load_samples_in_dir_tree(
+def load_samples_recursive(
     root: str,
     metadata_extractor: Callable[[str], Dict[str, str]],
     file_types: List[str] = None,
@@ -138,7 +142,21 @@ def load_samples_in_dir_tree(
     processes: int = None,
     limit: int = None,
 ) -> Dict[str, List[Tuple[str, Optional[np.ndarray], Optional[Dict[str, Any]]]]]:
-    directory_file_list_dict = find_files(root, file_types=file_types)
+    """
+    Recursively load (filename, np.array, metadata_dict) tuples for all files in directory tree starting at root.
+
+    :param root: root of the directory tree
+    :param metadata_extractor: function for extracting metadata form the filename
+    :param file_types: list of suffixes (file extensions) to load
+    :param sr: Samplerate to load the sample at. If left as None, the file samplerate is used.
+    :param duration: Max sample duration in seconds. If None, array will equal original file length.
+    If sample is longer, it will be cropped. If shorter, the array will be padded with zeros.
+    :param normalize: If true magnitude will be normalized to a value between 0 and 1.
+    :param processes: The number of worker processes to use. If None use os.cpu_count() cores.
+    :param limit: The limit of files to load in each directory.
+    :return: Dictionary of directories to lists of (filename, np.array, metadata_dict)
+    """
+    directory_file_list_dict = find_files_recursive(root, file_types=file_types)
     return {
         directory: load_samples(
             files, metadata_extractor, sr, duration, normalize, processes, limit
@@ -148,12 +166,19 @@ def load_samples_in_dir_tree(
 
 
 def write_numpy(path: str, array: np.ndarray) -> None:
+    """
+    Wrapper for writing writing numpy array to file
+    """
     np.save(path, array)
 
 
 def write_metadata(
     path: str, metadata: List[Dict[str, str]], fieldnames: List[str]
 ) -> None:
+    """
+    Writes a list of homogenous metadata dictionaries as a csv file.
+    All dictionaries in metadata should have the same keys.
+    """
     with open(path, "w+") as f:
         writer = csv.DictWriter(f, fieldnames)
         writer.writeheader()
@@ -168,6 +193,13 @@ def write_audio_data(
     ],
     fieldnames: List[str] = None,
 ) -> None:
+    """
+    Writes a dictionary of directories to lists of (filename, np.array, metadata_dict) as files. 2 files are saved per
+    directory:
+     - {directory}_samples.npy file containing audio data as a numpy matrix for all samples in the dataset
+     - {directory}_metadata.csv file containing corresponding metadata extracted for the files
+
+    """
     for directory, files in directory_to_loaded_samples_dict.items():
         samples = []
         files_metadata = []
@@ -199,7 +231,7 @@ def main(
     input_dir, output_dir, dataset, processes, file_limit, dataset_configs_directory
 ):
     """Runs data processing scripts to turn raw data from (../raw) into
-    cleaned data ready to be analyzed (saved in ../processed).
+    preprocessed data ready for feature extraction (saved in ../processed).
     """
     input_dir = (
         os.path.join(PROJECT_DIR, "data", "raw") if input_dir is None else input_dir
@@ -216,8 +248,7 @@ def main(
     )
 
     dataset_config = dataset_config_factory(dataset, dataset_configs_directory)
-    logging.info(f"Loaded config for the {dataset} dataset")
-    directory_to_loaded_samples_dict = load_samples_in_dir_tree(
+    directory_to_loaded_samples_dict = load_samples_recursive(
         input_dir,
         metadata_extractor=dataset_config.get_extractor(),
         file_types=dataset_config.get_audio_file_types(),
