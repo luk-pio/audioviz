@@ -5,10 +5,10 @@ from typing import Callable, Dict, List, Any
 
 import yaml
 
-from src.common.utils import PROJECT_DIR
+from src.common.utils import DATASET_CONFIGS_DIR
 
 
-class DatasetConfigParser:
+class DatasetConfig:
     """
     Provides functionality for extracting dataset configs from yaml files. An example yaml
     file can be seen in /dataset_configs/example.yaml.
@@ -81,12 +81,17 @@ class DatasetConfigParser:
 
 def get_dataset_configs(dataset_configs_dir: str = "dataset_configs"):
     if dataset_configs_dir is None:
-        dataset_configs_dir = os.path.join(PROJECT_DIR, "dataset_configs")
+        dataset_configs_dir = DATASET_CONFIGS_DIR
     return [f for f in os.listdir(dataset_configs_dir) if f.endswith(".yaml")]
 
 
-def dataset_config_factory(dataset, dataset_configs_dir) -> DatasetConfigParser:
+def dataset_config_factory(dataset: str, dataset_configs_dir: str) -> DatasetConfig:
+    """
+    Loads a DatasetConfig from dataset_configs_dir
+    :param dataset: name of the dataset
+    :param dataset_configs_dir: directory containing dataset configs
+    """
     with open(os.path.join(dataset_configs_dir, dataset + ".yaml")) as f:
         dataset_config = yaml.safe_load(f)
     logging.info(f"Loaded config for the {dataset} dataset")
-    return DatasetConfigParser(dataset_config)
+    return DatasetConfig(dataset_config)

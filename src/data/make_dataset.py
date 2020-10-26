@@ -10,7 +10,13 @@ import click
 import librosa
 import numpy as np
 
-from src.common.utils import PROJECT_DIR
+from src.common.utils import (
+    PROJECT_DIR,
+    DATA_INTERIM_DIR,
+    DATA_PROCESSED_DIR,
+    DATA_RAW_DIR,
+    DATASET_CONFIGS_DIR,
+)
 from src.common.dataset_config import dataset_config_factory
 import src.common.log
 
@@ -233,16 +239,11 @@ def main(
     """Runs data processing scripts to turn raw data from (../raw) into
     preprocessed data ready for feature extraction (saved in ../processed).
     """
-    input_dir = (
-        os.path.join(PROJECT_DIR, "data", "raw") if input_dir is None else input_dir
-    )
-    output_dir = (
-        os.path.join(PROJECT_DIR, "data", "processed")
-        if output_dir is None
-        else output_dir
-    )
+    input_dir = DATA_RAW_DIR if input_dir is None else input_dir
+
+    output_dir = DATA_PROCESSED_DIR if output_dir is None else output_dir
     dataset_configs_directory = (
-        os.path.join(PROJECT_DIR, "dataset_configs")
+        DATASET_CONFIGS_DIR
         if dataset_configs_directory is None
         else dataset_configs_directory
     )
@@ -257,9 +258,7 @@ def main(
         processes=processes,
         limit=file_limit,
     )
-    write_audio_data(
-        os.path.join(PROJECT_DIR, "data", "interim"), directory_to_loaded_samples_dict
-    )
+    write_audio_data(DATA_INTERIM_DIR, directory_to_loaded_samples_dict)
 
 
 if __name__ == "__main__":
