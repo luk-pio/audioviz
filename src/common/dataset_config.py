@@ -7,6 +7,9 @@ import yaml
 
 from src.common.utils import DATASET_CONFIGS_DIR
 
+# noinspection PyUnresolvedReferences
+import src.common.log
+
 
 class DatasetConfig:
     """
@@ -37,7 +40,7 @@ class DatasetConfig:
             if fullmatch:
                 return fullmatch.groupdict()
             else:
-                logging.error(f"Could not match metadata_regex to {s}")
+                logging.exception(f"Could not match metadata_regex to {s}")
                 return {}
 
         return lb
@@ -78,6 +81,9 @@ class DatasetConfig:
         """Return the max audio duration to load for the files in the dataset"""
         return self.dataset_config.get("duration")
 
+    def get_name(self) -> str:
+        return self.dataset_config.get("name")
+
 
 def get_dataset_configs(dataset_configs_dir: str = "dataset_configs"):
     if dataset_configs_dir is None:
@@ -85,13 +91,20 @@ def get_dataset_configs(dataset_configs_dir: str = "dataset_configs"):
     return [f for f in os.listdir(dataset_configs_dir) if f.endswith(".yaml")]
 
 
-def dataset_config_factory(dataset: str, dataset_configs_dir: str) -> DatasetConfig:
+def dataset_config_factory(
+    dataset: str, dataset_configs_dir: str = DATASET_CONFIGS_DIR
+) -> DatasetConfig:
     """
     Loads a DatasetConfig from dataset_configs_dir
     :param dataset: name of the dataset
     :param dataset_configs_dir: directory containing dataset configs
     """
-    with open(os.path.join(dataset_configs_dir, dataset + ".yaml")) as f:
-        dataset_config = yaml.safe_load(f)
+    try:
+        path = os.path.join(dataset_configs_dir, dataset + ".yaml")
+        with open(path) as f:
+            dataset_config = yaml.safe_load(f)
+    except OSError:
+        logging.exception(f"Cannot load config file {path}")
+        raise
     logging.info(f"Loaded config for the {dataset} dataset")
     return DatasetConfig(dataset_config)

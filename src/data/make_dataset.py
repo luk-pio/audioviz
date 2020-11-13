@@ -10,15 +10,16 @@ import click
 import librosa
 import numpy as np
 
+# noinspection PyUnresolvedReferences
+import src.common.log
+
 from src.common.utils import (
-    PROJECT_DIR,
     DATA_INTERIM_DIR,
-    DATA_PROCESSED_DIR,
     DATA_RAW_DIR,
     DATASET_CONFIGS_DIR,
+    write_ndarray,
 )
 from src.common.dataset_config import dataset_config_factory
-import src.common.log
 
 
 def find_files_recursive(
@@ -34,15 +35,19 @@ def find_files_recursive(
     """
     if file_types is None:
         file_types = [""]
-    # Collect all of the sample file paths as strings
+    # Collect all of the sample file paths under root as strings and group them by directory
     directory_file_list_dict = defaultdict(list)
+    total_files = 0
     for dirpath, _, filenames in os.walk(root):
         dirname = os.path.split(dirpath)[1]
         for filename in filenames:
+            # Ignore the file if it doesn't have the required extension
             if any([filename.endswith(file_type) for file_type in file_types]):
+                total_files += 1
                 directory_file_list_dict[dirname].append(
                     os.path.join(dirpath, filename)
                 )
+    logging.info(f"Found {total_files} files under {root}.")
     return directory_file_list_dict
 
 
@@ -162,6 +167,7 @@ def load_samples_recursive(
     :param limit: The limit of files to load in each directory.
     :return: Dictionary of directories to lists of (filename, np.array, metadata_dict)
     """
+    logging.info(f"Attempting to load files from {root}")
     directory_file_list_dict = find_files_recursive(root, file_types=file_types)
     return {
         directory: load_samples(
@@ -171,25 +177,15 @@ def load_samples_recursive(
     }
 
 
-def write_numpy(path: str, array: np.ndarray) -> None:
-    """
-    Wrapper for writing writing numpy array to file
-    """
-    np.save(path, array)
-
-
-def write_metadata(
-    path: str, metadata: List[Dict[str, str]], fieldnames: List[str]
-) -> None:
+def write_dict_as_csv(path: str, dict: List[Dict[str, str]], header: List[str]) -> None:
     """
     Writes a list of homogenous metadata dictionaries as a csv file.
     All dictionaries in metadata should have the same keys.
     """
     with open(path, "w+") as f:
-        writer = csv.DictWriter(f, fieldnames)
+        writer = csv.DictWriter(f, header)
         writer.writeheader()
-        writer.writerows(metadata)
-    logging.info(f"wrote metadata to file {path}")
+        writer.writerows(dict)
 
 
 def write_audio_data(
@@ -206,6 +202,7 @@ def write_audio_data(
      - {directory}_metadata.csv file containing corresponding metadata extracted for the files
 
     """
+    # TODO refactor this to be part of a dataset class with consistent I/O between scripts
     for directory, files in directory_to_loaded_samples_dict.items():
         samples = []
         files_metadata = []
@@ -214,21 +211,24 @@ def write_audio_data(
                 fieldnames = metadata.keys()
             samples.append(audio)
             files_metadata.append(metadata)
-        write_numpy(
-            os.path.join(root_dir, directory + "_samples.npy"), np.asarray(samples)
-        )
-        write_metadata(
-            os.path.join(root_dir, directory + "_metadata.csv"),
-            files_metadata,
-            fieldnames,
-        )
-
-        logging.info("Saved", len(samples), "samples of " + directory)
+        data_path = os.path.join(root_dir, directory + "_data.npy")
+        if write_ndarray(data_path, np.asarray(samples)):
+            logging.info(f"Saved { len(samples)} samples of {directory} to {data_path}")
+        else:
+            logging.error(
+                f"Failed to save {len(samples)} samples of {directory} to {data_path}"
+            )
+        metadata_path = os.path.join(root_dir, directory + "_metadata.csv")
+        try:
+            write_dict_as_csv(metadata_path, files_metadata, fieldnames)
+            logging.info(f"Wrote metadata to file {metadata_path}")
+        except OSError:
+            logging.exception(f"Could not write metadata file to {metadata_path}.")
 
 
 @click.command()
-@click.option("-input_dir", default=None, type=click.Path(exists=True))
-@click.option("-output_dir", default=None, type=click.Path())
+@click.argument("input_dir", default=None, type=click.Path(exists=True))
+@click.argument("output_dir", default=None, type=click.Path())
 @click.option("-dataset", default="medley-solos-db")
 @click.option("-processes", default=None, type=click.INT)
 @click.option("-file_limit", default=None, type=click.INT)
@@ -241,7 +241,6 @@ def main(
     """
     input_dir = DATA_RAW_DIR if input_dir is None else input_dir
 
-    output_dir = DATA_PROCESSED_DIR if output_dir is None else output_dir
     dataset_configs_directory = (
         DATASET_CONFIGS_DIR
         if dataset_configs_directory is None
@@ -258,7 +257,9 @@ def main(
         processes=processes,
         limit=file_limit,
     )
-    write_audio_data(DATA_INTERIM_DIR, directory_to_loaded_samples_dict)
+
+    output_dir = DATA_INTERIM_DIR if output_dir is None else output_dir
+    write_audio_data(output_dir, directory_to_loaded_samples_dict)
 
 
 if __name__ == "__main__":

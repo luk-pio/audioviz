@@ -28,8 +28,11 @@ requirements: check_env test_environment
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
 
 ## Make Dataset
-data: requirements
-	$(PYTHON_INTERPRETER) src/data/make_dataset.py data/raw data/processed
+data:
+	$(PYTHON_INTERPRETER) src/data/make_dataset.py data/raw/Medley-solos-Db data/interim
+
+features:
+	$(PYTHON_INTERPRETER) src/features/build_features.py medley-solos-db '{"name":"stft", "args":{}}'
 
 ## Delete all compiled Python files
 clean:

@@ -1,7 +1,36 @@
-audioviz
-==============================
+```
+_____/\\\\\\\\\__________________________/\\\________________________________________________________
+ ___/\\\\\\\\\\\\\_______________________\/\\\________________________________________________________
+  __/\\\/////////\\\______________________\/\\\___/\\\______________________________/\\\_______________
+   _\/\\\_______\/\\\__/\\\____/\\\________\/\\\__\///______/\\\\\_____/\\\____/\\\_\///___/\\\\\\\\\\\_
+    _\/\\\\\\\\\\\\\\\_\/\\\___\/\\\___/\\\\\\\\\___/\\\___/\\\///\\\__\//\\\__/\\\___/\\\_\///////\\\/__
+     _\/\\\/////////\\\_\/\\\___\/\\\__/\\\////\\\__\/\\\__/\\\__\//\\\__\//\\\/\\\___\/\\\______/\\\/____
+      _\/\\\_______\/\\\_\/\\\___\/\\\_\/\\\__\/\\\__\/\\\_\//\\\__/\\\____\//\\\\\____\/\\\____/\\\/______
+       _\/\\\_______\/\\\_\//\\\\\\\\\__\//\\\\\\\/\\_\/\\\__\///\\\\\/______\//\\\_____\/\\\__/\\\\\\\\\\\_
+        _\///________\///___\/////////____\///////\//__\///_____\/////_________\///______\///__\///////////__
+```
 
-An analysis of dimensionality reduction and music information retrieval techniques for the visual representation of large audio datasets
+Exploring dimensionality reduction and music information retrieval techniques for visualizing large sets of audio data.
+
+## The problem
+Find an algorithm for producing visualizations of audio collections.
+
+## Formal problem definition
+> A computer program is said to learn from experience E with respect to some class of tasks T and performance measure P, if its performance at tasks in T, as measured by P, improves with experience E.
+
+* **Task (T)**: Reduce the dimensions (to 2 or 3) of a set of audio files.
+* **Experience (E)**: A dataset of audio files labeled based on similarity.
+* **Performance (P)**: *see scoring below*
+
+## Usage
+[//]: <> (Browsing folders = context switching to focused mode from diffuse of creative process)
+
+preprocess: `make data`
+
+extract features: `make features`
+
+## Feature selection
+
 
 Project Organization
 ------------
@@ -53,5 +82,3 @@ Project Organization
 
 
 --------
-
-<p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
