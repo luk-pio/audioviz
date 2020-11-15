@@ -23,8 +23,7 @@ def parse_feature_extractors(features):
     return feature_extractors
 
 
-def build_features(dataset_name, features, storage_type):
-    dataset = load_audioviz_dataset(dataset_name)
+def build_features(dataset, features, storage_type):
     path = os.path.join(DATA_PROCESSED_DIR, dataset.name + "." + storage_type)
     feature_collection = FeatureCollection(
         dataset, AudiovizDataStoreFactory.get_instance(path, storage_type)
@@ -58,6 +57,7 @@ def main(dataset, features, score, scoring_alg, storage_type):
     """
     # TODO remove, this is for debugging purposes only since pycharm mangles string arguments in run targets
     features = ['{"name":"stft", "args":{}}']
+    dataset = load_audioviz_dataset(dataset)
     build_features(dataset, features, storage_type)
 
     # if score:

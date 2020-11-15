@@ -1,20 +1,9 @@
 import click
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import MinMaxScaler
 
-from src.common.fun_call import parse_funcall, FunCallFactory
+from src.common.audioviz_dataset import load_audioviz_dataset
+from src.common.evaluation import eval_metrics, print_metrics
+from src.dimred.dimred_algorithms import parse_dimred_algorithm
 from src.features.build_features import build_features
-
-
-def pca(data):
-    reduced_data = PCA(n_components=2).fit_transform(data)
-    scaler = MinMaxScaler()
-    scaler.fit(reduced_data)
-    return scaler.transform(reduced_data)
-
-
-class DimRedAlgorithmFactory(FunCallFactory):
-    _implemented = {"pca": pca}
 
 
 @click.command()
@@ -29,12 +18,14 @@ def main(dataset, dimred_algorithm, features, scoring_alg, output_path, storage_
     features = ['{"name":"stft", "args":{}}']
     dimred_algorithm = '{"name":"pca", "args":{}}'
 
-    dimred_alg = parse_funcall(dimred_algorithm, DimRedAlgorithmFactory)
+    dataset = load_audioviz_dataset(dataset)
+    dimred_alg = parse_dimred_algorithm(dimred_algorithm)
     feature_collection = build_features(dataset, features, storage_type)
-    print(feature_collection._features)
     with feature_collection._store:
         nd = feature_collection.get_as_dataset()
         reduced = dimred_alg(nd)
+    metrics = eval_metrics(reduced, dataset.target)
+    print_metrics(metrics)
     print(reduced)
 
 
