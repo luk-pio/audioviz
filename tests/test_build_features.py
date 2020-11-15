@@ -17,7 +17,7 @@ def generate_AudiovizDataset(
 
     metadata = pd.DataFrame(metadata)
 
-    from src.common.AudiovizDataset import AudiovizDataset
+    from src.common.audioviz_dataset import AudiovizDataset
 
     return AudiovizDataset(data, metadata, name)
 
