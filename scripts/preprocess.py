@@ -18,7 +18,7 @@ def find_files(root: str, file_types: List[str] = None) -> Dict[str, List[str]]:
     :return:
     """
     if file_types is None:
-        file_types = ['']
+        file_types = [""]
     # Collect all of the sample file paths as strings
     directory_file_list_dict = defaultdict(list)
     for directory in os.walk(root):
@@ -32,10 +32,7 @@ def find_files(root: str, file_types: List[str] = None) -> Dict[str, List[str]]:
 
 
 def load_sample(
-        fn: str,
-        sr: int = None,
-        duration: float = None,
-        normalize: bool = True
+    fn: str, sr: int = None, duration: float = None, normalize: bool = True
 ) -> Tuple[str, Optional[np.typing.ArrayLike], Optional[Dict[Any]]]:
     """
     Load a sample as a one-dimensional np.ArrayLike. If sample has more than one track, it will be converted to mono.
@@ -49,12 +46,12 @@ def load_sample(
     :return: a tuple containing (filename, np.array, metadata_dict)
     """
 
-    if fn == '':  # ignore empty filenames
+    if fn == "":  # ignore empty filenames
         return fn, None, None
     try:
         audio, sr = librosa.load(fn, sr, mono=True, duration=duration)
     except OSError as e:
-        print(f'File {fn} could not be read: {e}')
+        print(f"File {fn} could not be read: {e}")
         return fn, None, None
     file_length = len(audio)
     if file_length == 0:  # ignore zero-length samples
@@ -70,20 +67,16 @@ def load_sample(
 
 
 def load_samples(
-        directory_file_list_dict: Dict[str, List[str]],
-        sr=None,
-        duration=None,
-        normalize=True,
-        processes: int = None,
-        limit=None
-) -> Dict[str,
-          List[
-              Tuple[str, Optional[np.typing.ArrayLike], Optional[Dict[Any]]]
-          ]
-]:
+    directory_file_list_dict: Dict[str, List[str]],
+    sr=None,
+    duration=None,
+    normalize=True,
+    processes: int = None,
+    limit=None,
+) -> Dict[str, List[Tuple[str, Optional[np.typing.ArrayLike], Optional[Dict[Any]]]]]:
     """
     Load a (filename, np.array, duration) tuple for all files in directory_file_list_dict.
-    
+
     :param directory_file_list_dict: Mapping between parent directories and lists of files
     :param sr: Samplerate to load the sample at. If left as None, the file samplerate is used.
     :param duration: Max sample duration in seconds. If None, array will equal original file length.
@@ -98,9 +91,11 @@ def load_samples(
     for instrument, files in directory_file_list_dict.items():
         directory_loaded_samples_dict[instrument] = pool.map(
             lambda fn: load_sample(fn, sr=sr, duration=duration, normalize=normalize),
-            files[:limit]
+            files[:limit],
         )
-        print(f'Processed {len(directory_loaded_samples_dict[instrument])} samples for {instrument}')
+        print(
+            f"Processed {len(directory_loaded_samples_dict[instrument])} samples for {instrument}"
+        )
     return directory_loaded_samples_dict
 
 
@@ -108,26 +103,31 @@ def write_numpy(path: str, samples: np.typing.ArrayLike) -> None:
     """
     Write audio data to file.
     """
-    with open(path, 'w+') as f:
+    with open(path, "w+") as f:
         np.save(f, samples)
 
 
-def write_metadata(path: str, metadata: List[Dict[str, str]], fieldnames: List[str]) -> None:
+def write_metadata(
+    path: str, metadata: List[Dict[str, str]], fieldnames: List[str]
+) -> None:
     """
     Write audio metadata to file
     """
-    with open(path, 'w+') as f:
+    with open(path, "w+") as f:
         writer = csv.DictWriter(f, fieldnames)
         writer.writeheader()
         writer.writerows(metadata)
 
 
 def write_audio_data(
-        root_dir: str,
-        directory_loaded_samples_dict: Dict[str, List[Tuple[str, Optional[np.typing.ArrayLike], Optional[Dict[Any]]]]],
-        fieldnames: List[str] = None) -> None:
+    root_dir: str,
+    directory_loaded_samples_dict: Dict[
+        str, List[Tuple[str, Optional[np.typing.ArrayLike], Optional[Dict[Any]]]]
+    ],
+    fieldnames: List[str] = None,
+) -> None:
     if fieldnames is None:
-        fieldnames = ['duration']
+        fieldnames = ["duration"]
     for directory, files in directory_loaded_samples_dict.items():
         samples = []
         files_metadata = []
@@ -136,20 +136,27 @@ def write_audio_data(
                 continue
             samples.append(audio)
             files_metadata.append(metadata)
-        write_numpy(os.path.join(root_dir, directory, '_samples.npy'), np.asarray(samples))
-        write_metadata(os.path.join(root_dir, directory, '_metadata.txt'), files_metadata, fieldnames)
+        write_numpy(
+            os.path.join(root_dir, directory, "_samples.npy"), np.asarray(samples)
+        )
+        write_metadata(
+            os.path.join(root_dir, directory, "_metadata.txt"),
+            files_metadata,
+            fieldnames,
+        )
 
-        print('Saved', len(samples), 'samples of ' + directory)
+        print("Saved", len(samples), "samples of " + directory)
 
 
 def main():
     from scripts.utils import DATA_DIR
+
     directory_file_list_dict = find_files(DATA_DIR)
     directory_loaded_samples_dict = load_samples(directory_file_list_dict, duration=2)
-    write_audio_data(os.path.join(DATA_DIR, 'artifacts'), directory_loaded_samples_dict)
+    write_audio_data(os.path.join(DATA_DIR, "artifacts"), directory_loaded_samples_dict)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 # pickle.dump(CLASSNAMES, open(data_root+"/CLASSNAMES.pickle", "w"))
 # pickle.dump(lengths, open(data_root+"/lengths.pickle", "w"))
