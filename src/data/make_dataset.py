@@ -1,23 +1,27 @@
 # -*- coding: utf-8 -*-
 import csv
+import importlib
 import logging
 import os
+import sys
 from collections import defaultdict
 from functools import partial
 from typing import Tuple, List, Dict, Optional, Any, Callable
 
 import click
 import librosa
+import mirdata
 import numpy as np
 
 # noinspection PyUnresolvedReferences
 import src.common.log
 
+from src.common.audioviz_dataset import save_medley_solos_db
+
 from src.common.utils import (
     DATA_INTERIM_DIR,
     DATA_RAW_DIR,
     DATASET_CONFIGS_DIR,
-    write_ndarray,
 )
 from src.common.dataset_config import dataset_config_factory
 
@@ -124,15 +128,6 @@ def load_samples(
 
     # TODO multiprocessing
 
-    # job = partial(load_sample())
-    #
-    # pool = Pool(processes)
-    # processed_files = pool.map(
-    #     job,
-    #     ( file_list[:limit] )
-    # )
-    # logging.info(f'Processed {len(file_list)}')
-    # return processed_files
     job = partial(
         load_sample,
         metadata_extractor=metadata_extractor,
@@ -140,6 +135,13 @@ def load_samples(
         duration=duration,
         normalize=normalize,
     )
+    # pool = Pool(processes)
+    # processed_files = pool.map(
+    #     job,
+    #     ( file_list[:limit] )
+    # )
+    # logging.info(f'Processed {len(file_list)}')
+    # return processed_files
     return [job(fn) for fn in file_list[:limit]]
 
 
@@ -177,89 +179,65 @@ def load_samples_recursive(
     }
 
 
-def write_dict_as_csv(path: str, dict: List[Dict[str, str]], header: List[str]) -> None:
-    """
-    Writes a list of homogenous metadata dictionaries as a csv file.
-    All dictionaries in metadata should have the same keys.
-    """
-    with open(path, "w+") as f:
-        writer = csv.DictWriter(f, header)
-        writer.writeheader()
-        writer.writerows(dict)
-
-
-def write_audio_data(
-    root_dir: str,
-    directory_to_loaded_samples_dict: Dict[
-        str, List[Tuple[str, Optional[np.ndarray], Optional[Dict[str, Any]]]]
-    ],
-    fieldnames: List[str] = None,
-) -> None:
-    """
-    Writes a dictionary of directories to lists of (filename, np.array, metadata_dict) as files. 2 files are saved per
-    directory:
-     - {directory}_samples.npy file containing audio data as a numpy matrix for all samples in the dataset
-     - {directory}_metadata.csv file containing corresponding metadata extracted for the files
-
-    """
-    # TODO refactor this to be part of a dataset class with consistent I/O between scripts
-    for directory, files in directory_to_loaded_samples_dict.items():
-        samples = []
-        files_metadata = []
-        for fn, audio, metadata in files:
-            if fieldnames is None:
-                fieldnames = metadata.keys()
-            samples.append(audio)
-            files_metadata.append(metadata)
-        data_path = os.path.join(root_dir, directory + "_data.npy")
-        if write_ndarray(data_path, np.asarray(samples)):
-            logging.info(f"Saved { len(samples)} samples of {directory} to {data_path}")
-        else:
-            logging.error(
-                f"Failed to save {len(samples)} samples of {directory} to {data_path}"
-            )
-        metadata_path = os.path.join(root_dir, directory + "_metadata.csv")
-        try:
-            write_dict_as_csv(metadata_path, files_metadata, fieldnames)
-            logging.info(f"Wrote metadata to file {metadata_path}")
-        except OSError:
-            logging.exception(f"Could not write metadata file to {metadata_path}.")
-
-
 @click.command()
-@click.argument("input_dir", default=None, type=click.Path(exists=True))
-@click.argument("output_dir", default=None, type=click.Path())
-@click.option("-dataset", default="medley-solos-db")
+@click.option("--download", default=False)
+@click.option("--verify", default=False)
+@click.option("-input_dir", default=DATA_RAW_DIR, type=click.Path(exists=True))
+@click.option("-output_dir", default=DATA_INTERIM_DIR, type=click.Path())
+@click.option("-dataset", default="medley_solos_db")
 @click.option("-processes", default=None, type=click.INT)
 @click.option("-file_limit", default=None, type=click.INT)
-@click.option("-dataset_configs_directory", default=None, type=click.Path(exists=True))
+@click.option(
+    "-dataset_configs_directory",
+    default=DATASET_CONFIGS_DIR,
+    type=click.Path(exists=True),
+)
 def main(
-    input_dir, output_dir, dataset, processes, file_limit, dataset_configs_directory
+    download,
+    verify,
+    input_dir,
+    output_dir,
+    dataset,
+    processes,
+    file_limit,
+    dataset_configs_directory,
 ):
-    """Runs data processing scripts to turn raw data from (../raw) into
-    preprocessed data ready for feature extraction (saved in ../processed).
     """
-    input_dir = DATA_RAW_DIR if input_dir is None else input_dir
+    Runs data processing scripts to turn raw data from (../raw) into
+    preprocessed data ready for feature extraction (saved in ../processed).
 
-    dataset_configs_directory = (
-        DATASET_CONFIGS_DIR
-        if dataset_configs_directory is None
-        else dataset_configs_directory
+    Parameters
+    ----------
+    input_dir: directory of the raw dataset
+    output_dir: directory in which to save output files
+    dataset: string id of the dataset. As specified in dataset config
+    processes: number of processes to utilize for loading samples
+    file_limit: The maximum number of files to load from each directory
+    dataset_configs_directory: the path to the dataset configs directory
+
+    Returns
+    -------
+    None
+
+    """
+
+    datasets_savers = {"medley_solos_db": save_medley_solos_db}
+    mirdata_module = importlib.import_module(f"mirdata.{dataset}")
+    if download:
+        logging.info("Downloading dataset...")
+        mirdata_module.download(data_home=input_dir)
+    if verify:
+        logging.info("Validating dataset...")
+        mirdata_module.validate(data_home=input_dir)
+    loaded = mirdata_module.load(data_home=input_dir)
+    logging.info("Loaded dataset metadata.")
+
+    output_path = os.path.join(output_dir, f"{ dataset }_data.h5")
+    logging.info("Saving dataset to " + output_path)
+
+    datasets_savers[dataset](
+        dataset, loaded, output_path, ["instrument_id", "subset", "song_id"]
     )
-
-    dataset_config = dataset_config_factory(dataset, dataset_configs_directory)
-    directory_to_loaded_samples_dict = load_samples_recursive(
-        input_dir,
-        metadata_extractor=dataset_config.get_extractor(),
-        file_types=dataset_config.get_audio_file_types(),
-        sr=dataset_config.get_samplerate(),
-        duration=dataset_config.get_duration(),
-        processes=processes,
-        limit=file_limit,
-    )
-
-    output_dir = DATA_INTERIM_DIR if output_dir is None else output_dir
-    write_audio_data(output_dir, directory_to_loaded_samples_dict)
 
 
 if __name__ == "__main__":

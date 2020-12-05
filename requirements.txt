@@ -1,3 +1,5 @@
+# Editable Git install with no remote (src==0.1.0)
+-e /home/l/Workspace/audioviz
 appdirs==1.4.4
 audioread==2.1.8
 certifi==2020.6.20
@@ -6,14 +8,18 @@ chardet==3.0.4
 click==7.1.2
 decorator==4.4.2
 flake8==3.8.3
+h5py~=3.1.0
 idna==2.10
 joblib==0.16.0
 librosa==0.8.0
 llvmlite==0.34.0
 mccabe==0.6.1
+
+mirdata~=0.2.2
 numba==0.51.2
 numpy==1.19.2
 packaging==20.4
+pandas~=1.1.3
 pooch==1.2.0
 pycodestyle==2.6.0
 pycparser==2.20
@@ -23,11 +29,13 @@ python-dotenv==0.14.0
 PyYAML==5.3.1
 requests==2.24.0
 resampy==0.2.2
+scikit-image~=0.17.2
 scikit-learn==0.23.2
 scipy==1.5.2
+setuptools~=50.3.2
+Shapely~=1.7.1
 six==1.15.0
 SoundFile==0.10.3.post1
-# Editable Git install with no remote (src==0.1.0)
--e /home/l/Workspace/audioviz
+src~=0.1.0
 threadpoolctl==2.1.0
 urllib3==1.25.10
