@@ -68,15 +68,15 @@ class Hdf5AudiovizDataStore(AbstractAudiovizDataStore):
     def __init__(self, path: str):
         if not os.path.isdir(os.path.dirname(path)):
             raise OSError(f"{path} is not in a valid directory.")
-        self._path = path
+        self.path = path
         self._file = None
 
-    def open(self):
-        self._file = h5py.File(self._path, "a")
+    def open(self, mode="a"):
+        self._file = h5py.File(self.path, mode)
         return self._file
 
-    def __enter__(self):
-        self.open()
+    def __enter__(self, mode="a"):
+        self.open(mode)
 
     def __getitem__(self, key):
         # TODO refactor to decorator
@@ -117,19 +117,6 @@ class Hdf5AudiovizDataStore(AbstractAudiovizDataStore):
     def write(
         self, key: str, data: Any, metadata: Dict[str, Any] = None, dtype=None,
     ):
-        """
-
-        Parameters
-        ----------
-        key
-        data
-        metadata
-        dtype
-
-        Returns
-        -------
-
-        """
         # TODO refactor to decorator
         was_open = bool(self._file)
         if not was_open:
