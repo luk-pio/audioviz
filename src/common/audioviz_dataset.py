@@ -1,4 +1,5 @@
 import gc
+import os
 from collections import defaultdict
 from typing import List, Dict, Any
 
@@ -11,10 +12,13 @@ import src.common.log
 from src.common.audioviz_datastore import (
     AbstractAudiovizDataStore,
     AudiovizDataStoreFactory,
+    Hdf5AudiovizDataStore,
 )
+from src.common.dataset_config import dataset_config_factory
+from src.common.utils import DATA_INTERIM_DIR
 
 
-class AudiovizDataset(Bunch):
+class AudiovizDataset:
     """
     Represents a dataset. In essence a dictionary, which can also be accessed through attributes.
     Follows sckikit-learn conventions:
@@ -44,66 +48,66 @@ class AudiovizDataset(Bunch):
 
     def __init__(
         self,
-        data: np.ndarray,
-        target: pd.DataFrame,
+        store,
         name: str,
+        target_key: str = None,
+        dataset_key: str = None,
         target_names: List[str] = None,
+        metadata_keys: str = None,
         data_filename: str = None,
-        metadata_filename: str = None,
-        metadata: pd.DataFrame = None,
     ):
-        if len(data.shape) < 2 or data.shape[0] < 1 or data.shape[1] < 1:
-            raise ValueError("AudiovizDataset data must be a non-empty 2d ndarray.")
-        if not name:
-            raise ValueError("AudiovizDataset must have a non-empty name.")
-        if target is None or target.size != data.shape[0]:
-            raise ValueError(
-                "AudiovizDataset must have a target dataframe with length equal to number datapoints."
-            )
 
-        super().__init__(
-            data=data,
-            target=target,
-            name=name,
-            target_names=target_names,
-            data_filename=data_filename,
-            metadata_filename=metadata_filename,
-            metadata=metadata,
+        self._store = store
+        self.name = name
+        self.target_key = target_key if target_key is not None else "class"
+        self.dataset_key = dataset_key if dataset_key is not None else name
+        self._target_names = target_names
+        self.metadata_keys = metadata_keys
+        self.data_filename = data_filename
+
+    @property
+    def data(self):
+        return self._store[self.dataset_key]
+
+    @property
+    def target(self):
+        return self._store[self.target_key]
+
+    @property
+    def target_names(self):
+        self._target_names = (
+            self._target_names if self._target_names is not None else set(self.target)
         )
+        return self._target_names
 
-    # @staticmethod
-    # def load(name: str, store: AbstractAudiovizDataStore = None):
-    #     config = dataset_config_factory(name)
-    #     if store is None:
-    #         file_prefix = config.get_name()
-    #         file_path = os.path.join(DATA_INTERIM_DIR, file_prefix + "_data.h5")
-    #         store = Hdf5AudiovizDataStore(file_path)
-    #     data = store[]
-    #     return AudiovizDataset(
-    #         data=data,
-    #         target=metadata["class"],
-    #         name=name,
-    #         target_names=config.get_classes(),
-    #         data_filename=file_path,
-    #         metadata_filename=metadata_path,
-    #         metadata=metadata,
-    #     )
+    @property
+    def shape(self):
+        return self.data.shape
 
-    # @staticmethod
-    # def dump(directory, fieldnames, files_metadata, root_dir, samples):
-    #     data_path = os.path.join(root_dir, directory + "_data.h5")
-    #     np.asarray(samples):
-    #         logging.info(f"Saved {len(samples)} samples of {directory} to {data_path}")
-    #     else:
-    #         logging.error(
-    #             f"Failed to save {len(samples)} samples of {directory} to {data_path}"
-    #         )
-    #     metadata_path = os.path.join(root_dir, directory + "_metadata.csv")
-    #     try:
-    #         write_dict_as_csv(metadata_path, files_metadata, fieldnames)
-    #         logging.info(f"Wrote metadata to file {metadata_path}")
-    #     except OSError:
-    #         logging.exception(f"Could not write metadata file to {metadata_path}.")
+    def map_chunked(self, func, chunksize):
+        with self._store:
+            rows = self.shape[0]
+            n = rows // chunksize
+            for i in range(1, n + 1):
+                chunk = self.data[i * chunksize - chunksize : i * chunksize]
+                yield [func(row) for row in chunk]
+            chunk = self.data[n * chunksize :]
+            yield [func(row) for row in chunk]
+
+    @staticmethod
+    def load(name: str, store: AbstractAudiovizDataStore = None):
+        if store is None:
+            file_path = os.path.join(DATA_INTERIM_DIR, name + "_data.h5")
+            store = Hdf5AudiovizDataStore(file_path)
+        with store:
+            target_names = store[name].attrs["classes"]
+        return AudiovizDataset(
+            store=store,
+            name=name,
+            target_key="instrument_id",
+            target_names=target_names,
+            data_filename=store.path,
+        )
 
 
 def save_medley_solos_db(
@@ -148,32 +152,31 @@ def save_medley_solos_db(
         store._file.create_dataset(name, shape=shape)
     i = 0
     chunksize = 200
-    for _, sample in dataset.items():
-        samples.append(sample.audio[0])
-        # Turn list of metadata dictionaries for each file into one dict with a list of vals
-        for key in ["instrument_id", "subset", "song_id"]:
-            value = getattr(sample, key)
-            # Convert subset to nominal
-            if key == "subset":
-                value = subsets_mapping[value]
-            files_metadata[key].append(value)
-        i += 1
-        if i % 100 == 0:
-            print(f"Processed {i} samples")
-        if i % chunksize == 0:
-            with store:
-                ds = store[name]
-                ds[i - chunksize : i] = np.asarray(samples)
-            print(f"Wrote chunk: [{i-chunksize}:{i}]")
-        del samples
-        gc.collect()
-        samples = []
     with store:
-        ds = store[name]
-        remainder = i % chunksize
-        ds[i - remainder : i] = np.asarray(samples)
-        for k, v in files_metadata.items():
-            store._file.create_dataset(k, data=v)
+        for _, sample in dataset.items():
+            samples.append(sample.audio[0])
+            # Turn list of metadata dictionaries for each file into one dict with a list of vals
+            for key in ["instrument_id", "subset", "song_id"]:
+                value = getattr(sample, key)
+                # Convert subset to nominal
+                if key == "subset":
+                    value = subsets_mapping[value]
+                files_metadata[key].append(value)
+            i += 1
+            if i % 100 == 0:
+                print(f"Processed {i} samples")
+                if i % chunksize == 0:
+                    ds = store[name]
+                    ds[i - chunksize : i] = np.asarray(samples)
+                print(f"Wrote chunk: [{i-chunksize}:{i}]")
+            del samples
+            gc.collect()
+    samples = []
+    ds = store[name]
+    remainder = i % chunksize
+    ds[i - remainder : i] = np.asarray(samples)
+    for k, v in files_metadata.items():
+        store._file.create_dataset(k, data=v)
         for k, v in dataset_metadata.items():
             ds.attrs[k] = v
 
@@ -193,49 +196,3 @@ def save_medley_solos_db(
 #             msg = f"The dataset {dataset} has not been implemented"
 #             logging.exception(msg)
 #             raise NotImplementedError(msg) from err
-#
-# @staticmethod
-# def load(name):
-#     config = dataset_config_factory(name)
-#     file_prefix = config.get_name()
-#     data_path = os.path.join(DATA_INTERIM_DIR, file_prefix + "_data.npy")
-#     metadata_path = os.path.join(DATA_INTERIM_DIR, file_prefix + "_metadata.csv")
-#     try:
-#         data = np.load(data_path)
-#     except IOError:
-#         logging.error(
-#             f"Could not read file at {data_path}. Have you run preprocessing for this dataset?"
-#         )
-#         raise
-#     try:
-#         metadata = pd.read_csv(metadata_path)
-#     except IOError:
-#         logging.error(
-#             f"Could not read file at {metadata_path}. Have you run preprocessing for this dataset?"
-#         )
-#         raise
-#     return AudiovizDataset(
-#         data=data,
-#         target=metadata["class"],
-#         name=name,
-#         target_names=config.get_classes(),
-#         data_filename=data_path,
-#         metadata_filename=metadata_path,
-#         metadata=metadata,
-#     )
-#
-# @staticmethod
-# def dump(directory, fieldnames, files_metadata, root_dir, samples):
-#     data_path = os.path.join(root_dir, directory + "_data.npy")
-#     if write_ndarray(data_path, np.asarray(samples)):
-#         logging.info(f"Saved {len(samples)} samples of {directory} to {data_path}")
-#     else:
-#         logging.error(
-#             f"Failed to save {len(samples)} samples of {directory} to {data_path}"
-#         )
-#     metadata_path = os.path.join(root_dir, directory + "_metadata.csv")
-#     try:
-#         write_dict_as_csv(metadata_path, files_metadata, fieldnames)
-#         logging.info(f"Wrote metadata to file {metadata_path}")
-#     except OSError:
-#         logging.exception(f"Could not write metadata file to {metadata_path}.")

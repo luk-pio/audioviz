@@ -3,7 +3,7 @@ from functools import reduce
 
 from scipy.spatial import ConvexHull
 from shapely.geometry import Polygon
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, calinski_harabasz_score
 
 
 # construct a polygon from vertices of a convex hull
@@ -33,10 +33,11 @@ def eval_metrics(data, cluster_labels):
     metrics = OrderedDict(
         {
             "Silhouette": silhouette_score(data, cluster_labels),
-            "Convex hull overlap": overlap_ratio(data, cluster_labels),
+            "Convex_hull_overlap": overlap_ratio(data, cluster_labels),
+            "Calinski_Harabash": calinski_harabasz_score(data, cluster_labels),
         }
     )
-    metrics["Total"] = sum(metrics.keys())
+    metrics["Total"] = sum(metrics.values())
     return metrics
 
 

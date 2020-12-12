@@ -3,7 +3,7 @@ import os
 
 import click
 
-from src.common.audioviz_dataset import load_audioviz_dataset
+from src.common.audioviz_dataset import AudiovizDataset
 from src.common.audioviz_datastore import AudiovizDataStoreFactory
 from src.common.fun_call import parse_funcall
 from src.features.feature_extractors import FeatureExtractorFactory
@@ -24,9 +24,10 @@ def parse_feature_extractors(features):
 
 
 def build_features(dataset, features, storage_type):
-    path = os.path.join(DATA_PROCESSED_DIR, dataset.name + "." + storage_type)
+    path = os.path.join(DATA_PROCESSED_DIR, dataset + "." + storage_type)
     feature_collection = FeatureCollection(
-        dataset, AudiovizDataStoreFactory.get_instance(path, storage_type)
+        AudiovizDataset.load(dataset),
+        AudiovizDataStoreFactory.get_instance(path, storage_type),
     )
     feature_extractors = parse_feature_extractors(features)
     feature_collection.update(feature_extractors)
@@ -34,7 +35,7 @@ def build_features(dataset, features, storage_type):
 
 
 @click.command()
-@click.argument("dataset", default="medley-solos-db", type=str)
+@click.argument("dataset", default="medley_solos_db", type=str)
 @click.argument("features", nargs=-1, type=str)  # features along with kwargs
 @click.option("--score/--build", default=False)
 @click.option("-scoring_alg")  # if -score
@@ -57,7 +58,6 @@ def main(dataset, features, score, scoring_alg, storage_type):
     """
     # TODO remove, this is for debugging purposes only since pycharm mangles string arguments in run targets
     features = ['{"name":"stft", "args":{}}']
-    dataset = load_audioviz_dataset(dataset)
     build_features(dataset, features, storage_type)
 
     # if score:
