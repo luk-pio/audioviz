@@ -6,9 +6,9 @@ import click
 from src.common.audioviz_dataset import AudiovizDataset
 from src.common.audioviz_datastore import AudiovizDataStoreFactory
 from src.common.fun_call import parse_funcall
-from src.features.feature_extractors import FeatureExtractorFactory
 from src.common.utils import DATA_PROCESSED_DIR
 from src.features.feature_collection import FeatureCollection
+from src.features.feature_extractors import FeatureExtractorFactory
 
 
 def parse_feature_extractors(features):

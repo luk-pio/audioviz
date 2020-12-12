@@ -1,5 +1,4 @@
 import logging
-from sys import path
 from typing import List, Set
 
 import numpy as np
