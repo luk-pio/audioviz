@@ -1,35 +1,34 @@
-import logging
+import json
 import os
+from typing import Any, Dict, List
 
 import click
 
 from src.common.audioviz_dataset import AudiovizDataset
 from src.common.audioviz_datastore import AudiovizDataStoreFactory
-from src.common.fun_call import parse_funcall
-from src.common.utils import DATA_PROCESSED_DIR
-from src.features.feature_collection import FeatureCollection
+from src.common.fun_call import parse_funcall, parse_funcalls
+from src.common.utils import DATA_FEATURES_DIR
+from src.features.feature_collection import FuncallStore
 from src.features.feature_extractors import FeatureExtractorFactory
 
 
+def parse_feature_extractor(feature):
+    return parse_funcall(feature, FeatureExtractorFactory)
+
+
 def parse_feature_extractors(features):
-    feature_extractors = []
-    for feature in features:
-        try:
-            fe = parse_funcall(feature, FeatureExtractorFactory)
-        except Exception:
-            logging.exception(f"Skipping feature {feature} ...")
-            continue
-        feature_extractors.append(fe)
-    return feature_extractors
+    return parse_funcalls(features, FeatureExtractorFactory)
 
 
-def build_features(dataset, features, storage_type):
-    path = os.path.join(DATA_PROCESSED_DIR, dataset + "." + storage_type)
-    feature_collection = FeatureCollection(
-        AudiovizDataset.load(dataset),
-        AudiovizDataStoreFactory.get_instance(path, storage_type),
+def get_features(
+    dataset: AudiovizDataset, features: List[Dict[str, Any]], storage_type="h5"
+):
+    path = os.path.join(DATA_FEATURES_DIR, dataset.name + "." + storage_type)
+    feature_collection = FuncallStore(
+        dataset, AudiovizDataStoreFactory.get_instance(path, storage_type),
     )
-    feature_extractors = parse_feature_extractors(features)
+    stringified_features = [json.dumps(feature) for feature in features]
+    feature_extractors = parse_feature_extractors(stringified_features)
     feature_collection.update(feature_extractors)
     return feature_collection
 
@@ -43,7 +42,7 @@ def build_features(dataset, features, storage_type):
 def main(dataset, features, score, scoring_alg, storage_type):
     """
     Runs data processing scripts to turn raw data from (../raw) into
-    cleaned data ready to be analyzed (saved in ../processed).
+    cleaned data ready to be analyzed (saved in ../features).
 
     1. does the feature file in output path exist? read or create as pd.Dataframe
     2. loop through all wanted features
@@ -57,8 +56,9 @@ def main(dataset, features, score, scoring_alg, storage_type):
     7. output score to stdout
     """
     # TODO remove, this is for debugging purposes only since pycharm mangles string arguments in run targets
-    features = ['{"name":"stft", "args":{}}']
-    build_features(dataset, features, storage_type)
+    features = [{"name": "stft", "args": {}}]
+    dataset = AudiovizDataset.load(dataset)
+    get_features(dataset, features, storage_type)
 
     # if score:
     #     score_features()

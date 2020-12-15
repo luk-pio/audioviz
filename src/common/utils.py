@@ -9,7 +9,8 @@ PROJECT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = os.path.join(PROJECT_DIR, "data")
 DATA_RAW_DIR = os.path.join(DATA_DIR, "raw")
 DATA_INTERIM_DIR = os.path.join(DATA_DIR, "interim")
-DATA_PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
+DATA_FEATURES_DIR = os.path.join(DATA_DIR, "features")
+DATA_DIMRED_DIR = os.path.join(DATA_DIR, "dimred")
 
 DATASET_CONFIGS_DIR = os.path.join(PROJECT_DIR, "dataset_configs")
 

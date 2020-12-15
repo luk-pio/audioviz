@@ -204,7 +204,7 @@ def main(
 ):
     """
     Runs data processing scripts to turn raw data from (../raw) into
-    preprocessed data ready for feature extraction (saved in ../processed).
+    preprocessed data ready for feature extraction (saved in ../features).
 
     Parameters
     ----------

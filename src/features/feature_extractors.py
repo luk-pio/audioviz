@@ -40,5 +40,20 @@ def audioviz_stft(
     return np.asarray(job(y))
 
 
+def audioviz_mfcc(
+    y, st=22050, S=None, n_mfcc=20, dct_type=2, norm="ortho", lifter=0, hop_length=256,
+):
+    return librosa.feature.mfcc(
+        y,
+        st,
+        S,
+        n_mfcc=n_mfcc,
+        dct_type=dct_type,
+        norm=norm,
+        lifter=lifter,
+        hop_length=hop_length,
+    )
+
+
 class FeatureExtractorFactory(FunCallFactory):
-    _implemented = {"stft": audioviz_stft}
+    _implemented = {"stft": audioviz_stft, "mfcc": audioviz_mfcc}

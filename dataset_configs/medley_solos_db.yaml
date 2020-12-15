@@ -1,0 +1,30 @@
+name: "Medley-solos-Db"
+
+classes:
+  - 'clarinet'
+  - 'distorted electric guitar'
+  - 'female singer'
+  - 'flute'
+  - 'piano'
+  - 'tenor saxophone'
+  - 'trumpet'
+  - 'violin'
+
+colors:
+   ['#ff4000',
+   '#ffbf00',
+   '#0000ff',
+   '#00ffbf',
+   '#00bfff',
+   '#8000ff',
+   '#ff0088',
+   '#ff0080']
+
+samplerate: 44100
+
+duration: 2.972
+
+file_types:
+  - '.wav'
+
+metadata_regex: 'Medley-solos-DB_(?P<subset>test|training|validation)-(?P<class>\d)_\S*\.wav'

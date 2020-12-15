@@ -13,6 +13,7 @@ idna==2.10
 joblib==0.16.0
 librosa==0.8.0
 llvmlite==0.34.0
+matplotlib~=3.3.3
 mccabe==0.6.1
 
 mirdata~=0.2.2
@@ -38,4 +39,6 @@ six==1.15.0
 SoundFile==0.10.3.post1
 src~=0.1.0
 threadpoolctl==2.1.0
+
+tqdm~=4.54.0
 urllib3==1.25.10
