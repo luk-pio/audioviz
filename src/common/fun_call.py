@@ -16,16 +16,24 @@ class FunCall:
         self.name = name
         self.func = func
         self.args = args
+        self._suffix = ""
 
     def __call__(self, *args, **kwargs):
         return partial(self.func, **self.args)(*args, **kwargs)
+
+    def add_suffix(self, suffix):
+        self._suffix = suffix
 
     def __repr__(self):
         return (
             f"{self.__class__.__name__}(name={self.name}, "
             f"func={pickle.dumps(self.func, protocol=0).decode('ascii')}, "
-            f"args={self.args})"
+            f"args={self.args})" + self._suffix
         )
+
+    def __str__(self):
+        args_str = " ".join([f"{k}={v}" for k, v in self.args.items()])
+        return f"{self.name}({args_str})"
 
 
 class FunCallFactory(ABC):
@@ -49,7 +57,6 @@ class FunCallFactory(ABC):
 
 
 def parse_funcall(funcall, factory):
-    logging.info(f"Attempting to decode function call {funcall}")
     try:
         fc = factory.get_instance(
             **json.loads(funcall, encoding=str(sys.stdin.encoding))
@@ -57,5 +64,17 @@ def parse_funcall(funcall, factory):
     except Exception:
         logging.exception(f"Could not decode function call {funcall}.")
         raise
-    logging.info(f"Successfully Decoded function call {funcall}.")
+    logging.info(f"Successfully Decoded function call {str(fc)}.")
     return fc
+
+
+def parse_funcalls(funcalls, funcallFactory):
+    parsed = []
+    for funcall in funcalls:
+        try:
+            fe = parse_funcall(funcall, funcallFactory)
+        except Exception:
+            logging.exception(f"Skipping funcall {funcall} ...")
+            continue
+        parsed.append(fe)
+    return parsed

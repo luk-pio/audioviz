@@ -4,8 +4,6 @@ from collections import defaultdict
 from typing import List, Dict, Any
 
 import numpy as np
-import pandas as pd
-from sklearn.utils import Bunch
 
 # noinspection PyUnresolvedReferences
 import src.common.log
@@ -14,38 +12,10 @@ from src.common.audioviz_datastore import (
     AudiovizDataStoreFactory,
     Hdf5AudiovizDataStore,
 )
-from src.common.dataset_config import dataset_config_factory
 from src.common.utils import DATA_INTERIM_DIR
 
 
 class AudiovizDataset:
-    """
-    Represents a dataset. In essence a dictionary, which can also be accessed through attributes.
-    Follows sckikit-learn conventions:
-
-    Returns
-    -------
-    data : :class:`~sklearn.utils.Bunch`
-        Dictionary-like object, with the following attributes.
-
-        data : dataframe
-            The data matrix.
-        target: Series
-            The classification target.
-        target_names: list
-            The names of target classes.
-        frame: DataFrame
-            DataFrame with `data` and `target`.
-        DESCR: str
-            The full description of the dataset.
-        data_filename: str
-            The path to the location of the data.
-        metadata_filename: str
-            The path to the location of the data.
-        metadata: dict
-            pd.Dataframe of any remaining metadata
-    """
-
     def __init__(
         self,
         store,
@@ -61,7 +31,7 @@ class AudiovizDataset:
         self.name = name
         self.target_key = target_key if target_key is not None else "class"
         self.dataset_key = dataset_key if dataset_key is not None else name
-        self._target_names = target_names
+        self.target_names = target_names
         self.metadata_keys = metadata_keys
         self.data_filename = data_filename
 
@@ -74,17 +44,21 @@ class AudiovizDataset:
         return self._store[self.target_key]
 
     @property
-    def target_names(self):
-        self._target_names = (
-            self._target_names if self._target_names is not None else set(self.target)
-        )
-        return self._target_names
-
-    @property
     def shape(self):
         return self.data.shape
 
+    @property
+    def colors(self):
+        return self.data.attrs["colors"]
+
+    @property
+    def color_map(self):
+        if self._color_map is None:
+            self._color_map = [self.colors[t] for t in self.target]
+        return self._color_map
+
     def map_chunked(self, func, chunksize):
+        # TODO Refactor this out to _store?
         with self._store:
             rows = self.shape[0]
             n = rows // chunksize
@@ -94,13 +68,30 @@ class AudiovizDataset:
             chunk = self.data[n * chunksize :]
             yield [func(row) for row in chunk]
 
+    def get_samples_for_class(self, clazz: int, num_samples: int):
+        ret = []
+        for i, val in enumerate(self.target):
+            if val == clazz:
+                ret.append(i)
+            if len(ret) < num_samples:
+                return ret
+
+    def get_samples_for_each_class(
+        self, num=2,
+    ):
+        samples = [[] for _ in range(len(self.target_names))]
+        for i, val in enumerate(self.target):
+            if len(samples[val]) < num:
+                samples[val].append(i)
+        return samples
+
     @staticmethod
     def load(name: str, store: AbstractAudiovizDataStore = None):
         if store is None:
             file_path = os.path.join(DATA_INTERIM_DIR, name + "_data.h5")
             store = Hdf5AudiovizDataStore(file_path)
         with store:
-            target_names = store[name].attrs["classes"]
+            target_names = list(store[name].attrs["classes"])
         return AudiovizDataset(
             store=store,
             name=name,
@@ -133,11 +124,23 @@ def save_medley_solos_db(
         "trumpet",
         "violin",
     ]
+    colors = [
+        "#ff4000",
+        "#ffbf00",
+        "#0000ff",
+        "#00ffbf",
+        "#00bfff",
+        "#8000ff",
+        "#ff0088",
+        "#aeff00",
+    ]
+
     samplerate = next(iter(dataset.items()))[1].audio[1]
     dataset_metadata = {
         "subsets_list": subsets_list,
         "classes": classes,
         "samplerate": samplerate,
+        "colors": colors,
     }
 
     samples = []
