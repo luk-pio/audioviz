@@ -89,7 +89,6 @@ def normalize_scores(dimred_collection, labels, algs, do_rescore=False):
 
     for s in scores:
         del s["K-means V-measure"]
-        del s["Time Total"]
         s[C_H] = s[C_H] / max_c_h
         s[S] = ((1 + s[S]) / 2) / max_s
         s[CV_H_O] /= max_cv_h_o
