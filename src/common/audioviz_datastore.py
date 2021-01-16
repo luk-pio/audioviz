@@ -78,6 +78,9 @@ class Hdf5AudiovizDataStore(AbstractAudiovizDataStore):
     def __enter__(self, mode="a"):
         self.open(mode)
 
+    def __delitem__(self, key):
+        del self._file[key]
+
     def __getitem__(self, key):
         # TODO refactor to decorator
         was_open = bool(self._file)
@@ -135,7 +138,7 @@ class AudiovizDataStoreFactory:
     implemented = {"h5": Hdf5AudiovizDataStore}
 
     @classmethod
-    def get_instance(cls, path: str, storage_type: str):
+    def get_instance(cls, path: str, storage_type: str) -> AbstractAudiovizDataStore:
         try:
             return cls.implemented[storage_type](path)
         except KeyError as err:

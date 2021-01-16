@@ -4,7 +4,7 @@ import pickle
 import sys
 from abc import ABC
 from functools import partial
-from typing import List, Any
+from typing import List, Any, Dict
 
 
 class FunCall:
@@ -16,24 +16,28 @@ class FunCall:
         self.name = name
         self.func = func
         self.args = args
-        self._suffix = ""
+        self._suffix = []
 
     def __call__(self, *args, **kwargs):
         return partial(self.func, **self.args)(*args, **kwargs)
 
     def add_suffix(self, suffix):
-        self._suffix = suffix
+        self._suffix.append(suffix)
 
     def __repr__(self):
+        suffix = "".join([s.__repr__() for s in self._suffix])
         return (
             f"{self.__class__.__name__}(name={self.name}, "
             f"func={pickle.dumps(self.func, protocol=0).decode('ascii')}, "
-            f"args={self.args})" + self._suffix
+            f"args={self.args})" + suffix
         )
 
     def __str__(self):
         args_str = " ".join([f"{k}={v}" for k, v in self.args.items()])
-        return f"{self.name}({args_str})"
+        suffix = (
+            f" <- ({''.join([str(s) for s in self._suffix])})" if self._suffix else ""
+        )
+        return f"{self.name}({args_str})" + suffix
 
 
 class FunCallFactory(ABC):
@@ -48,7 +52,7 @@ class FunCallFactory(ABC):
             )
 
     @classmethod
-    def get_instance(cls, name: str, args: List[Any]):
+    def get_instance(cls, name: str, args: Dict[str, Any]):
         try:
             return FunCall(name, cls.implemented()[name], args)
         except KeyError as err:
