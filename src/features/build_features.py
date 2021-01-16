@@ -6,7 +6,7 @@ import click
 
 from src.common.audioviz_dataset import AudiovizDataset
 from src.common.audioviz_datastore import AudiovizDataStoreFactory
-from src.common.fun_call import parse_funcall, parse_funcalls
+from src.common.fun_call import parse_funcall, parse_funcalls, FunCall
 from src.common.utils import DATA_FEATURES_DIR
 from src.features.feature_collection import FuncallStore
 from src.features.feature_extractors import FeatureExtractorFactory
@@ -21,15 +21,17 @@ def parse_feature_extractors(features):
 
 
 def get_features(
-    dataset: AudiovizDataset, features: List[Dict[str, Any]], storage_type="h5"
+    dataset: AudiovizDataset, funcalls: List[FunCall], storage_type="h5", path=None,
 ):
-    path = os.path.join(DATA_FEATURES_DIR, dataset.name + "." + storage_type)
+    path = (
+        os.path.join(DATA_FEATURES_DIR, f"{dataset.name}_features.{storage_type}")
+        if path is None
+        else path
+    )
     feature_collection = FuncallStore(
         dataset, AudiovizDataStoreFactory.get_instance(path, storage_type),
     )
-    stringified_features = [json.dumps(feature) for feature in features]
-    feature_extractors = parse_feature_extractors(stringified_features)
-    feature_collection.update(feature_extractors)
+    feature_collection.update(funcalls)
     return feature_collection
 
 
@@ -55,10 +57,9 @@ def main(dataset, features, score, scoring_alg, storage_type):
     6. run a scoring function on this dataset
     7. output score to stdout
     """
-    # TODO remove, this is for debugging purposes only since pycharm mangles string arguments in run targets
-    features = [{"name": "stft", "args": {}}]
     dataset = AudiovizDataset.load(dataset)
-    get_features(dataset, features, storage_type)
+    funcalls = parse_feature_extractors(features)
+    get_features(dataset, funcalls, storage_type)
 
     # if score:
     #     score_features()

@@ -22,11 +22,13 @@ class AudiovizDataset:
         name: str,
         target_key: str = None,
         dataset_key: str = None,
+        subset_key: str = None,
         target_names: List[str] = None,
         metadata_keys: str = None,
         data_filename: str = None,
     ):
 
+        self.subset_key = subset_key if subset_key is not None else "subset"
         self._store = store
         self.name = name
         self.target_key = target_key if target_key is not None else "class"
@@ -34,6 +36,7 @@ class AudiovizDataset:
         self.target_names = target_names
         self.metadata_keys = metadata_keys
         self.data_filename = data_filename
+        self._color_map = None
 
     @property
     def data(self):
@@ -52,9 +55,19 @@ class AudiovizDataset:
         return self.data.attrs["colors"]
 
     @property
-    def color_map(self):
+    def subset(self):
+        return self._store[self.subset_key]
+
+    def get_subset_rows(self, subset: str):
+        try:
+            index = np.where(self.data.attrs["subsets_list"] == subset)[0][0] + 1
+        except IndexError as e:
+            raise KeyError(f"Could not find subset with key {subset} in Dataset") from e
+        return np.where(self.subset[:] == index)
+
+    def color_map(self, rows):
         if self._color_map is None:
-            self._color_map = [self.colors[t] for t in self.target]
+            self._color_map = [self.colors[t] for t in self.target[rows]]
         return self._color_map
 
     def map_chunked(self, func, chunksize):

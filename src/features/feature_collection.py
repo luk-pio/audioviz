@@ -20,14 +20,17 @@ class FuncallStore:
         self.__funcalls: List[FunCall] = []
 
     def update(self, funcalls: List[FunCall]):
-
         with self._store:
             for fa in funcalls:
                 self.add(fa)
 
     @property
-    def _funcalls(self):
+    def funcall_ids(self):
         return [f.__repr__() for f in self.__funcalls]
+
+    @property
+    def funcalls(self):
+        return self.__funcalls[:]
 
     def __str__(self):
         return "".join([str(f) for f in self.__funcalls])
@@ -35,14 +38,17 @@ class FuncallStore:
     def __repr__(self):
         return "".join([f.__repr__() for f in self.__funcalls])
 
+    def __len__(self):
+        return len(self.__funcalls)
+
     def __getitem__(self, key: FunCall):
-        if key.__repr__() in self._funcalls:
+        if key in self:
             return self._store[key.__repr__()]
         else:
             raise KeyError(key)
 
     def __contains__(self, item: FunCall):
-        return item.__repr__() in self._funcalls
+        return item.__repr__() in self.funcall_ids
 
     def __in_store(self, item: FunCall):
         return item.__repr__() in self._store
@@ -65,11 +71,12 @@ class FuncallStore:
             if not was_open:
                 self._store.close()
 
-    def get_as_matrix(self):
+    def get_as_matrix(self, rows=None):
         # TODO implement iterator for FeatureCollection for convenience this then becomes "for fe in self"
-        if not self._funcalls:
+        if not self.funcall_ids:
             return np.ndarray([])
-        return np.concatenate([self[fe] for fe in self.__funcalls], axis=1)
+        sl = rows if rows is not None else slice(None, None)
+        return np.concatenate([self[fe][sl] for fe in self.__funcalls], axis=1)
 
     def _process(self, funcall: FunCall, chunksize=1000):
         logging.info(f"Calculating funcall {funcall.name} with chunksize {chunksize}")
@@ -94,4 +101,6 @@ class FuncallStore:
                 msg = f"Processed chunk [{chunk_start}:{chunk_end}]"
                 logging.debug(msg)
                 pbar.update(chunksize)
-        self._funcalls.append(funcall)
+            elapsed = pbar.format_dict["elapsed"]
+            ds.attrs["time"] = elapsed
+        self.__funcalls.append(funcall)
